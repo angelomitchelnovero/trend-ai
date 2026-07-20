@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Palette — jeepney signboard / Manila dusk, not the cream+terracotta default */
+  --paper: #FAF7F0;
+  --ink: #17181A;
+  --manila-blue: #1B3A5C;
+  --sunrise-gold: #F2A93B;
+  --coral: #E85D4E;
+  --teal: #2E7D6B;
+  --line: #E4DFD3;
+
+  --font-display: 'Fraunces', serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
