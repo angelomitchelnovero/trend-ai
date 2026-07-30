@@ -6,7 +6,7 @@ once that experiment's output quality is judged good enough.
 import os
 import time
 
-import google.generativeai as genai
+from google import genai
 from google.api_core.exceptions import ResourceExhausted
 from sqlalchemy.orm import Session
 
@@ -32,18 +32,18 @@ SECONDS_BETWEEN_CALLS = 13
 MAX_RETRIES_ON_RATE_LIMIT = 3
 RATE_LIMIT_RETRY_WAIT = 20
 
-_model = None
+# Used for Philippine news summaries and shared digest generation. Global
+# English briefs in app/ai/trends.py use gemini-2.5-flash-lite to keep both
+# daily buckets under their independent 20 req/day free-tier ceilings.
+SUMMARY_MODEL = "gemini-2.5-flash"
+_client = None
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-        # gemini-1.5-flash was fully shut down by Google — 1.5 models all 404 now.
-        # If gemini-2.5-flash also 404s in the future, check current model names at
-        # https://ai.google.dev/gemini-api/docs/models
-        _model = genai.GenerativeModel("gemini-2.5-flash")
-    return _model
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    return _client
 
 
 def summarize_article(article: Article) -> str:
@@ -51,7 +51,10 @@ def summarize_article(article: Article) -> str:
 
     for attempt in range(1, MAX_RETRIES_ON_RATE_LIMIT + 1):
         try:
-            response = _get_model().generate_content(prompt)
+            response = _get_client().models.generate_content(
+                model=SUMMARY_MODEL,
+                contents=prompt,
+            )
             return response.text.strip()
         except ResourceExhausted:
             if attempt == MAX_RETRIES_ON_RATE_LIMIT:

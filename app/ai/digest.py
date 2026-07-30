@@ -5,11 +5,14 @@ good enough to show on the dashboard.
 """
 
 import os
+import time
 from datetime import datetime, timedelta
 
-import google.generativeai as genai
+from google import genai
+from google.api_core.exceptions import ResourceExhausted
 from sqlalchemy.orm import Session
 
+from app.ai.summarize import MAX_RETRIES_ON_RATE_LIMIT, RATE_LIMIT_RETRY_WAIT
 from app.models.schema import Article, Digest, TrendingTerm
 
 DIGEST_PROMPT = """You are writing a short daily "what's trending in the
@@ -32,18 +35,33 @@ Global signals:
 
 Global briefing:"""
 
-_model = None
+# gemini-2.5-flash — same model as Philippine summaries; this digest is the
+# climactic output of the day, worth the higher-quality bucket.
+DIGEST_MODEL = "gemini-2.5-flash"
+_client = None
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-        # gemini-1.5-flash was fully shut down by Google — 1.5 models all 404 now.
-        # If gemini-2.5-flash also 404s in the future, check current model names at
-        # https://ai.google.dev/gemini-api/docs/models
-        _model = genai.GenerativeModel("gemini-2.5-flash")
-    return _model
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    return _client
+
+
+def _generate(prompt: str) -> str:
+    for attempt in range(1, MAX_RETRIES_ON_RATE_LIMIT + 1):
+        try:
+            response = _get_client().models.generate_content(
+                model=DIGEST_MODEL,
+                contents=prompt,
+            )
+            return response.text.strip()
+        except ResourceExhausted:
+            if attempt == MAX_RETRIES_ON_RATE_LIMIT:
+                raise
+            print(f"    Rate limited — waiting {RATE_LIMIT_RETRY_WAIT}s (retry {attempt}/{MAX_RETRIES_ON_RATE_LIMIT})...")
+            time.sleep(RATE_LIMIT_RETRY_WAIT)
+    raise RuntimeError("unreachable")  # loop always returns or raises above
 
 
 def generate_daily_digest(db: Session, max_stories: int = 8) -> Digest:
@@ -65,8 +83,8 @@ def generate_daily_digest(db: Session, max_stories: int = 8) -> Digest:
     )
     prompt = DIGEST_PROMPT.format(stories=stories_block)
 
-    response = _get_model().generate_content(prompt)
-    digest = Digest(content=response.text.strip(), scope="philippines")
+    text = _generate(prompt)
+    digest = Digest(content=text, scope="philippines")
     db.add(digest)
     db.commit()
     db.refresh(digest)
@@ -93,8 +111,8 @@ def generate_global_digest(db: Session, max_signals: int = 8) -> Digest:
         f"[{signal.category_name}] {signal.title or signal.term} — {signal.summary}"
         for signal in signals
     )
-    response = _get_model().generate_content(GLOBAL_DIGEST_PROMPT.format(signals=signals_block))
-    digest = Digest(content=response.text.strip(), scope="global")
+    text = _generate(GLOBAL_DIGEST_PROMPT.format(signals=signals_block))
+    digest = Digest(content=text, scope="global")
     db.add(digest)
     db.commit()
     db.refresh(digest)

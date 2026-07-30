@@ -9,6 +9,11 @@ python-dotenv>=1.0.0
 apscheduler>=3.10.4
 
 # AI
+google-genai>=1.0.0
+# google-generativeai is deprecated by Google as of 2025-09 and gives a
+# FutureWarning on every import. Kept here briefly so any leftover import
+# path doesn't break import resolution during the cutover — remove in a
+# later sweep once grep -r "google.generativeai" app/ is empty.
 google-generativeai>=0.5.0
 
 # Ingestion

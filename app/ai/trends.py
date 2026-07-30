@@ -5,26 +5,35 @@ import re
 import time
 from html import unescape
 
-import google.generativeai as genai
 import requests
+from google import genai
+from google.api_core.exceptions import ResourceExhausted
 from sqlalchemy.orm import Session
 
-from app.ai.summarize import SECONDS_BETWEEN_CALLS
+from app.ai.summarize import (
+    MAX_RETRIES_ON_RATE_LIMIT,
+    RATE_LIMIT_RETRY_WAIT,
+    SECONDS_BETWEEN_CALLS,
+)
 from app.models.schema import TrendingTerm
 
 META_DESCRIPTION = re.compile(
     r'<meta[^>]+(?:name|property)=["\'](?:description|og:description)["\'][^>]+content=["\']([^"\']+)',
     re.IGNORECASE,
 )
-_model = None
+
+# flash-lite uses its own free-tier quota bucket, so Philippine summaries
+# (gemini-2.5-flash) and global cards (gemini-2.5-flash-lite) don't share a
+# single 20-req/day ceiling. Daily global enrichment stays very short anyway.
+GLOBAL_MODEL = "gemini-2.5-flash-lite"
+_client = None
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-        _model = genai.GenerativeModel("gemini-2.5-flash")
-    return _model
+def _get_client():
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    return _client
 
 
 def _source_description(url: str | None) -> str:
@@ -49,8 +58,22 @@ SUMMARY: two short English sentences explaining what happened and why it may mat
 
 Original title: {title}
 Publisher description: {description or 'No publisher description available.'}"""
-    response = _get_model().generate_content(prompt).text.strip()
-    title_line, _, summary_line = response.partition("\n")
+
+    for attempt in range(1, MAX_RETRIES_ON_RATE_LIMIT + 1):
+        try:
+            response = _get_client().models.generate_content(
+                model=GLOBAL_MODEL,
+                contents=prompt,
+            )
+            text = response.text.strip()
+            break
+        except ResourceExhausted:
+            if attempt == MAX_RETRIES_ON_RATE_LIMIT:
+                raise
+            print(f"    Rate limited — waiting {RATE_LIMIT_RETRY_WAIT}s (retry {attempt}/{MAX_RETRIES_ON_RATE_LIMIT})...")
+            time.sleep(RATE_LIMIT_RETRY_WAIT)
+
+    title_line, _, summary_line = text.partition("\n")
     english_title = title_line.removeprefix("TITLE:").strip() or title
     summary = summary_line.removeprefix("SUMMARY:").strip()
     if not summary:
@@ -59,7 +82,12 @@ Publisher description: {description or 'No publisher description available.'}"""
 
 
 def enrich_global_trends(db: Session, limit: int = 4) -> int:
-    """Translate and summarize unprocessed global trend records, paced for Gemini's free tier."""
+    """Translate and summarize unprocessed global trend records, paced for Gemini's free tier.
+
+    Returns the number of records fully processed. Caller is responsible for
+    catching ResourceExhausted so the daily run doesn't crash mid-flight when
+    a 429 hits late in the day.
+    """
     terms = (db.query(TrendingTerm)
         .filter(TrendingTerm.scope == "global", TrendingTerm.summary.is_(None))
         .order_by(TrendingTerm.captured_at.desc())
