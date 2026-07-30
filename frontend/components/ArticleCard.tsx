@@ -11,11 +11,13 @@ type Article = {
 
 const CATEGORY_COLORS: Record<string, string> = {
   Politics: "var(--manila-blue)",
-  Business: "var(--teal)",
-  Showbiz: "var(--coral)",
+  Finance: "var(--teal)",
+  Entertainment: "var(--coral)",
   Sports: "var(--sunrise-gold)",
   "Weather/Disaster": "var(--coral)",
-  "Metro/Local": "var(--teal)",
+  Local: "var(--teal)",
+  AI: "var(--coral)",
+  Tech: "var(--manila-blue)",
 };
 
 function timeAgo(iso: string | null): string {
@@ -27,7 +29,7 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function ArticleCard({ article }: { article: Article }) {
+export default function ArticleCard({ article, variant = "feed" }: { article: Article; variant?: "feed" | "card" }) {
   const categoryColor = article.category
     ? CATEGORY_COLORS[article.category] || "var(--ink)"
     : "var(--ink)";
@@ -37,7 +39,9 @@ export default function ArticleCard({ article }: { article: Article }) {
       href={article.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block border-b py-5 group focus:outline-none focus-visible:ring-2"
+      className={variant === "card"
+        ? "block border rounded-sm p-5 h-full group focus:outline-none focus-visible:ring-2"
+        : "block border-b py-5 group focus:outline-none focus-visible:ring-2"}
       style={{ borderColor: "var(--line)" }}
     >
       <div className="flex items-center gap-3 mb-2 font-mono text-xs">

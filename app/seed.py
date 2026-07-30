@@ -14,12 +14,14 @@ SOURCES = [
 ]
 
 CATEGORIES = [
+    "AI",
+    "Tech",
     "Politics",
-    "Business",
-    "Showbiz",
+    "Finance",
+    "Entertainment",
     "Sports",
     "Weather/Disaster",
-    "Metro/Local",
+    "Local",
 ]
 
 

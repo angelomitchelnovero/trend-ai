@@ -63,10 +63,19 @@ def summarize_article(article: Article) -> str:
 
 
 def summarize_unprocessed(db: Session, limit: int = 20) -> int:
-    """Summarize articles that don't have an AI summary yet. Paced to stay
-    under the free-tier rate limit, and commits after each article so
-    progress isn't lost if a later one fails."""
-    articles = db.query(Article).filter(Article.summary.is_(None)).limit(limit).all()
+    """Summarize articles that don't have an AI summary yet. Prioritizes the
+    newest articles first — otherwise, with a backlog of older unsummarized
+    articles, this would keep chipping away at old news and the daily
+    digest's 24h window would never find anything fresh to work with.
+    Paced to stay under the free-tier rate limit, and commits after each
+    article so progress isn't lost if a later one fails."""
+    articles = (
+        db.query(Article)
+        .filter(Article.summary.is_(None))
+        .order_by(Article.published_at.desc())
+        .limit(limit)
+        .all()
+    )
     count = 0
     for i, article in enumerate(articles):
         if not article.raw_summary:

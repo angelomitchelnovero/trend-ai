@@ -1,16 +1,23 @@
 "use client";
 
 type TrendingTerm = {
+  id?: number;
   term: string;
   source: string;
-  score: number | null;
+  score?: number | null;
 };
 
-export default function TrendingTicker({ terms }: { terms: TrendingTerm[] }) {
+export default function TrendingTicker({
+  terms,
+  onTermClick,
+}: {
+  terms: TrendingTerm[];
+  onTermClick?: (term: TrendingTerm) => void;
+}) {
   if (!terms.length) return null;
 
-  // Duplicate the list so the scroll loops seamlessly.
-  const loop = [...terms, ...terms];
+  // Duplicate only a varied list so one item never appears twice on screen.
+  const loop = terms.length > 1 ? [...terms, ...terms] : terms;
 
   return (
     <div
@@ -20,21 +27,26 @@ export default function TrendingTicker({ terms }: { terms: TrendingTerm[] }) {
     >
       <div className="ticker-track flex items-center gap-10 py-2 whitespace-nowrap">
         {loop.map((t, i) => (
-          <span
+          <button
             key={i}
-            className="font-mono text-xs tracking-wide"
+            onClick={() => onTermClick?.(t)}
+            className="font-mono text-xs tracking-wide hover:underline focus:outline-none"
             style={{ color: "var(--sunrise-gold)" }}
+            title={`Open the fact brief for "${t.term}"`}
           >
             <span className="opacity-70 mr-2">{t.source === "reddit" ? "r/" : "▲"}</span>
             {t.term}
-          </span>
+          </button>
         ))}
       </div>
 
       <style jsx>{`
         .ticker-track {
           width: max-content;
-          animation: scroll-left 40s linear infinite;
+          animation: scroll-left 95s linear infinite;
+        }
+        .ticker-track:hover {
+          animation-play-state: paused;
         }
         @keyframes scroll-left {
           from { transform: translateX(0); }

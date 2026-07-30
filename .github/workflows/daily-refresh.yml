@@ -1,0 +1,29 @@
+name: Daily Trend.ai refresh
+
+on:
+  schedule:
+    # 07:05 UTC is 3:05 PM in the Philippines (Asia/Manila, UTC+8).
+    # Five minutes past the hour avoids the busiest GitHub Actions schedule slot.
+    - cron: "5 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+      REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+      REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+      REDDIT_USER_AGENT: trendai-by-aloe/0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: alembic upgrade head
+      - run: python -m app.run_daily_refresh

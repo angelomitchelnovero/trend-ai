@@ -22,8 +22,10 @@ than crashing ingestion:
 import os
 
 import requests
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from app.categorize import classify
 from app.models.schema import TrendingTerm
 
 SUBREDDIT = "Philippines"
@@ -56,6 +58,19 @@ def _reddit_client():
     )
 
 
+def _previous_score(db: Session, term: str, source: str) -> int | None:
+    """Looks up this same term's most recent prior score, for velocity
+    tracking. Not yet surfaced in the UI — see TrendingTerm.previous_score
+    docstring in app/models/schema.py."""
+    prior = (
+        db.query(TrendingTerm)
+        .filter(TrendingTerm.term == term, TrendingTerm.source == source)
+        .order_by(desc(TrendingTerm.captured_at))
+        .first()
+    )
+    return prior.score if prior else None
+
+
 def ingest_reddit(db: Session) -> int:
     """Returns count of trending terms added. Returns 0 (no-op) if Reddit
     isn't installed/configured yet — this is expected while waiting on
@@ -68,7 +83,14 @@ def ingest_reddit(db: Session) -> int:
     for submission in reddit.subreddit(SUBREDDIT).hot(limit=NUM_POSTS):
         if submission.stickied:
             continue
-        db.add(TrendingTerm(term=submission.title, source="reddit", score=submission.score))
+        db.add(TrendingTerm(
+            term=submission.title,
+            source="reddit",
+            scope="philippines",
+            score=submission.score,
+            category_name=classify(submission.title),
+            previous_score=_previous_score(db, submission.title, "reddit"),
+        ))
         added += 1
     db.commit()
     return added
@@ -102,10 +124,14 @@ def ingest_google_trends(db: Session) -> int:
         term = item.get("query")
         if not term:
             continue
+        score = item.get("search_volume", rank)
         db.add(TrendingTerm(
             term=term,
             source="google_trends",
-            score=item.get("search_volume", rank),
+            scope="philippines",
+            score=score,
+            category_name=classify(term),
+            previous_score=_previous_score(db, term, "google_trends"),
         ))
         added += 1
     db.commit()

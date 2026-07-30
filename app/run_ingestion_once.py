@@ -14,7 +14,7 @@ def main():
     db = SessionLocal()
     try:
         print("Ingesting RSS feeds...")
-        rss_results = ingest_all_sources(db)
+        rss_results = ingest_all_sources(db, verbose=True)
         for source, result in rss_results.items():
             print(f"  {source}: {result}")
 

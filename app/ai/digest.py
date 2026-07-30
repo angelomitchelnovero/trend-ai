@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import google.generativeai as genai
 from sqlalchemy.orm import Session
 
-from app.models.schema import Article, Digest
+from app.models.schema import Article, Digest, TrendingTerm
 
 DIGEST_PROMPT = """You are writing a short daily "what's trending in the
 Philippines" briefing for a news dashboard. Below are today's top story
@@ -23,6 +23,14 @@ Stories:
 {stories}
 
 Daily briefing:"""
+
+GLOBAL_DIGEST_PROMPT = """You are writing a concise daily briefing for a global AI and technology news dashboard.
+Use only the facts in the supplied card summaries. Write 100-160 words that connect the most important developments, distinguish AI from broader technology where helpful, and explain why the shifts matter. Stay neutral and do not speculate or add outside knowledge.
+
+Global signals:
+{signals}
+
+Global briefing:"""
 
 _model = None
 
@@ -58,7 +66,35 @@ def generate_daily_digest(db: Session, max_stories: int = 8) -> Digest:
     prompt = DIGEST_PROMPT.format(stories=stories_block)
 
     response = _get_model().generate_content(prompt)
-    digest = Digest(content=response.text.strip())
+    digest = Digest(content=response.text.strip(), scope="philippines")
+    db.add(digest)
+    db.commit()
+    db.refresh(digest)
+    return digest
+
+
+def generate_global_digest(db: Session, max_signals: int = 8) -> Digest:
+    """Create a fact-grounded briefing from the latest enriched AI and Tech cards."""
+    signals = (
+        db.query(TrendingTerm)
+        .filter(
+            TrendingTerm.scope == "global",
+            TrendingTerm.category_name.in_(("AI", "Tech")),
+            TrendingTerm.summary.isnot(None),
+        )
+        .order_by(TrendingTerm.relevance_score.desc().nullslast(), TrendingTerm.captured_at.desc())
+        .limit(max_signals)
+        .all()
+    )
+    if not signals:
+        raise ValueError("No enriched global AI or Tech signals available to digest")
+
+    signals_block = "\n".join(
+        f"[{signal.category_name}] {signal.title or signal.term} — {signal.summary}"
+        for signal in signals
+    )
+    response = _get_model().generate_content(GLOBAL_DIGEST_PROMPT.format(signals=signals_block))
+    digest = Digest(content=response.text.strip(), scope="global")
     db.add(digest)
     db.commit()
     db.refresh(digest)

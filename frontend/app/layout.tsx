@@ -1,11 +1,12 @@
 import "./globals.css";
+import type { ReactNode } from "react";
 
 export const metadata = {
   title: "Trend.ai by Aloe",
-  description: "What's trending in the Philippines, summarized by AI.",
+  description: "Global AI and Tech trends, plus five high-signal Philippine news stories.",
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>

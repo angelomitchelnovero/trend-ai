@@ -9,10 +9,12 @@ process, separate from the FastAPI web process, on Fly.io/Railway.
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.ai.cluster import assign_clusters, embed_unprocessed
-from app.ai.digest import generate_daily_digest
+from app.ai.digest import generate_daily_digest, generate_global_digest
 from app.ai.summarize import summarize_unprocessed
+from app.ai.trends import enrich_global_trends
 from app.database import SessionLocal
 from app.ingestion.rss import ingest_all_sources
+from app.ingestion.gdelt import ingest_global_ai_tech
 from app.ingestion.social_trends import (
     ingest_google_trends,
     ingest_reddit,
@@ -39,9 +41,10 @@ def poll_trends():
     try:
         reddit_count = ingest_reddit(db)
         trends_count = ingest_google_trends(db)
+        global_count = ingest_global_ai_tech(db)
         reddit_note = "" if reddit_configured() else " (not configured yet)"
         trends_note = "" if serpapi_configured() else " (not configured yet)"
-        print(f"[trends] reddit={reddit_count}{reddit_note} google_trends={trends_count}{trends_note}")
+        print(f"[trends] reddit={reddit_count}{reddit_note} google_trends={trends_count}{trends_note} gdelt_global={global_count}")
     finally:
         db.close()
 
@@ -54,6 +57,28 @@ def enrich_articles():
         embedded = embed_unprocessed(db)
         clustered = assign_clusters(db)
         print(f"[enrich] summarized={summarized} embedded={embedded} clustered={clustered}")
+    finally:
+        db.close()
+
+
+@scheduler.scheduled_job("interval", minutes=35)
+def enrich_global_cards():
+    db = SessionLocal()
+    try:
+        enriched = enrich_global_trends(db)
+        print(f"[global cards] enriched={enriched}")
+    finally:
+        db.close()
+
+
+@scheduler.scheduled_job("interval", minutes=45)
+def build_global_digest():
+    db = SessionLocal()
+    try:
+        digest = generate_global_digest(db)
+        print(f"[global digest] generated id={digest.id}")
+    except ValueError as e:
+        print(f"[global digest] skipped: {e}")
     finally:
         db.close()
 

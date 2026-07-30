@@ -1,0 +1,23 @@
+# Backend
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.9
+pgvector>=0.2.5
+python-dotenv>=1.0.0
+apscheduler>=3.10.4
+
+# AI
+google-generativeai>=0.5.0
+
+# Ingestion
+feedparser>=6.0.10
+requests>=2.31.0
+praw>=7.7.1   # optional — only needed once Reddit approves API access; safe to leave installed even if unused
+# Google Trends: no separate package needed — uses SerpApi's HTTP API via `requests` directly.
+# (pytrends removed: its GitHub repo was archived/unmaintained as of April 2025, endpoint returns 404s)
+
+# Utilities
+python-dateutil>=2.9.0
+numpy>=1.26.0

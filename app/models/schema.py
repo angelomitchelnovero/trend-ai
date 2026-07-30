@@ -83,8 +83,31 @@ class TrendingTerm(Base):
     id = Column(Integer, primary_key=True)
     term = Column(String, nullable=False)
     source = Column(String, nullable=False)   # "reddit" | "google_trends"
-    score = Column(Integer, nullable=True)     # e.g. reddit score, trends rank
+    score = Column(Integer, nullable=True)     # e.g. reddit score, trends rank/volume
     captured_at = Column(DateTime, default=datetime.utcnow)
+
+    # Shared category system: reuses the same category names as Article
+    # (Politics, Business, Showbiz, Sports, Weather/Disaster, Metro/Local),
+    # assigned via lightweight keyword matching at ingestion time — see
+    # app/categorize.py. Stored as a plain string rather than a FK since
+    # every capture is a new row (trending snapshots aren't updated in
+    # place), and a string keeps ingestion simple/fast (no lookup needed).
+    category_name = Column(String, nullable=True)
+
+    # Velocity groundwork: the score this same term had on its previous
+    # capture, if any. Lets a future feature compute "climbing fast" vs
+    # "steady" without needing a full time-series query. Not yet surfaced
+    # in the UI — see app/ingestion/social_trends.py for how it's set.
+    previous_score = Column(Integer, nullable=True)
+
+    # Optional enriched card fields. Legacy Google/Reddit snapshots keep
+    # working because the API falls back to ``term`` when they are absent.
+    scope = Column(String, nullable=False, default="philippines")
+    title = Column(String, nullable=True)
+    summary = Column(Text, nullable=True)
+    url = Column(String, nullable=True)
+    ticker = Column(String, nullable=True)
+    relevance_score = Column(Integer, nullable=True)
 
 
 class Digest(Base):
@@ -96,4 +119,20 @@ class Digest(Base):
 
     id = Column(Integer, primary_key=True)
     content = Column(Text, nullable=False)
+    scope = Column(String, nullable=False, default="philippines")
     generated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PresenceHeartbeat(Base):
+    """Backs the live viewer count. The frontend pings /presence/heartbeat
+    every ~20s with a random per-tab session id; /presence/count counts
+    distinct session ids seen in the last ~45s. This is a real count, not
+    a faked/inflated number — it just undercounts slightly by design
+    (anyone who closes the tab without a final ping ages out naturally
+    rather than needing an explicit disconnect signal, which would need
+    websockets)."""
+
+    __tablename__ = "presence_heartbeats"
+
+    session_id = Column(String, primary_key=True)
+    last_seen = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

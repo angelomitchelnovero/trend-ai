@@ -1,71 +1,25 @@
-import ArticleCard from "@/components/ArticleCard";
-import DigestBanner from "@/components/DigestBanner";
-import TrendingTicker from "@/components/TrendingTicker";
-import { getArticles, getDigest, getTrending } from "@/lib/api";
+import FeedClient from "@/components/FeedClient";
+import { getArticles, getDigest, getGlobalDigest, getNewsAnalyzer, getTrending } from "@/lib/api";
 
 export default async function FeedPage() {
   let articles: Awaited<ReturnType<typeof getArticles>>["items"] = [];
-  let trending: { term: string; source: string; score: number | null }[] = [];
+  let trending: { id?: number; term: string; source: string; score: number | null; title?: string | null; summary?: string | null; url?: string | null; ticker?: string | null; category?: string | null; scope?: string | null }[] = [];
   let digest: { content: string; generated_at: string } | null = null;
+  let globalDigest: { content: string; generated_at: string } | null = null;
+  let analyzedNews: Awaited<ReturnType<typeof getNewsAnalyzer>>["items"] = [];
   let backendReachable = true;
 
   try {
-    const [articlesRes, trendingRes] = await Promise.all([
-      getArticles({ page: "1", page_size: "20" }),
-      getTrending(),
-    ]);
+    const [articlesRes, trendingRes, analyzerRes] = await Promise.all([getArticles({ page: "1", page_size: "20" }), getTrending(), getNewsAnalyzer()]);
     articles = articlesRes.items ?? [];
     trending = trendingRes;
+    analyzedNews = analyzerRes.items ?? [];
   } catch {
     backendReachable = false;
   }
 
-  try {
-    digest = await getDigest();
-  } catch {
-    // No digest yet, or backend unreachable — DigestBanner handles null.
-  }
+  try { digest = await getDigest(); } catch { /* No Philippine digest or summarized stories yet. */ }
+  try { globalDigest = await getGlobalDigest(); } catch { /* No global digest or enriched cards yet. */ }
 
-  return (
-    <main className="min-h-screen">
-      <TrendingTicker terms={trending} />
-
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <header className="mb-10">
-          <h1 className="font-display text-4xl font-semibold mb-1">Trend.ai</h1>
-          <p className="font-mono text-xs opacity-50">
-            what's trending in the Philippines, summarized by AI
-          </p>
-        </header>
-
-        <DigestBanner
-          content={digest?.content ?? null}
-          generatedAt={digest?.generated_at ?? null}
-        />
-
-        <section aria-label="Article feed">
-          {!backendReachable && (
-            <div className="border rounded-sm p-5 mb-6" style={{ borderColor: "var(--line)" }}>
-              <p className="font-mono text-xs opacity-50">
-                Can't reach the backend at {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}.
-                Make sure `uvicorn app.main:app --reload` is running.
-              </p>
-            </div>
-          )}
-
-          {backendReachable && articles.length === 0 && (
-            <div className="border rounded-sm p-5 mb-6" style={{ borderColor: "var(--line)" }}>
-              <p className="font-mono text-xs opacity-50">
-                Connected, but no articles yet — run ingestion to pull real data.
-              </p>
-            </div>
-          )}
-
-          {articles.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </section>
-      </div>
-    </main>
-  );
+  return <main className="min-h-screen"><FeedClient initialArticles={articles} initialTrending={trending} backendReachable={backendReachable} digestContent={digest?.content ?? null} digestGeneratedAt={digest?.generated_at ?? null} globalDigestContent={globalDigest?.content ?? null} globalDigestGeneratedAt={globalDigest?.generated_at ?? null} analyzedNews={analyzedNews} /></main>;
 }
