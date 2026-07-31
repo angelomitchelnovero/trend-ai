@@ -35,9 +35,11 @@ Global signals:
 
 Global briefing:"""
 
-# gemini-2.5-flash — same model as Philippine summaries; this digest is the
-# climactic output of the day, worth the higher-quality bucket.
-DIGEST_MODEL = "gemini-2.5-flash"
+# gemini-2.5-flash-lite — gemini-2.5-flash was retired for new API keys
+# (404s on first call). flash-lite is on the same free-tier quota bucket
+# as the global trend cards, and the digest prompt is short enough that
+# flash-lite's quality is fine here.
+DIGEST_MODEL = "gemini-2.5-flash-lite"
 _client = None
 
 
