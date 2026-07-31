@@ -35,11 +35,11 @@ Global signals:
 
 Global briefing:"""
 
-# gemini-2.5-flash-lite — gemini-2.5-flash was retired for new API keys
-# (404s on first call). flash-lite is on the same free-tier quota bucket
-# as the global trend cards, and the digest prompt is short enough that
-# flash-lite's quality is fine here.
-DIGEST_MODEL = "gemini-2.5-flash-lite"
+# gemini-flash-lite-latest — points at the current free-tier-eligible
+# flash-lite generation. Hardcoded "gemini-2.5-flash" and
+# "gemini-2.5-flash-lite" both 404 now that the 2.5 line is retired for
+# new API keys; the -latest alias survives Google's rotation.
+DIGEST_MODEL = "gemini-flash-lite-latest"
 _client = None
 
 

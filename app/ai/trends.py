@@ -22,10 +22,9 @@ META_DESCRIPTION = re.compile(
     re.IGNORECASE,
 )
 
-# flash-lite uses its own free-tier quota bucket, so Philippine summaries
-# (gemini-2.5-flash) and global cards (gemini-2.5-flash-lite) don't share a
-# single 20-req/day ceiling. Daily global enrichment stays very short anyway.
-GLOBAL_MODEL = "gemini-2.5-flash-lite"
+# -latest alias points at the current free-tier-eligible flash-lite
+# generation. Hardcoded "gemini-2.5-flash-lite" 404s for new API keys.
+GLOBAL_MODEL = "gemini-flash-lite-latest"
 _client = None
 
 

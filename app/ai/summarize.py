@@ -32,13 +32,12 @@ SECONDS_BETWEEN_CALLS = 13
 MAX_RETRIES_ON_RATE_LIMIT = 3
 RATE_LIMIT_RETRY_WAIT = 20
 
-# Used for Philippine news summaries and shared digest generation. Global
-# English briefs in app/ai/trends.py also use gemini-2.5-flash-lite to keep
-# both daily buckets under their independent 20 req/day free-tier ceilings.
-# gemini-2.5-flash was retired for new API keys (404s on first call), so
-# PH summaries moved to flash-lite too. The /ask endpoint in
-# app/routers/ask.py is the one call site that stays on flash for now.
-SUMMARY_MODEL = "gemini-2.5-flash-lite"
+# Used for Philippine news summaries and shared digest generation.
+# -latest alias points at whatever the current free-tier-eligible flash-lite
+# generation is. Hardcoding "gemini-2.5-flash-lite" 404s now that the
+# 2.5 line has been retired for new API keys; the -latest alias survives
+# Google's rotation without code changes.
+SUMMARY_MODEL = "gemini-flash-lite-latest"
 _client = None
 
 
